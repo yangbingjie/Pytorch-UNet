@@ -18,6 +18,7 @@ class BasicDataset(Dataset):
 
         self.ids = [splitext(file)[0] for file in listdir(imgs_dir)
                     if not file.startswith('.')]
+
         logging.info(f'Creating dataset with {len(self.ids)} examples')
 
     def __len__(self):
@@ -26,7 +27,8 @@ class BasicDataset(Dataset):
     @classmethod
     def preprocess(cls, pil_img, scale):
         w, h = pil_img.size
-        newW, newH = int(scale * w), int(scale * h)
+        newW, newH = 512, 512
+        
         assert newW > 0 and newH > 0, 'Scale is too small'
         pil_img = pil_img.resize((newW, newH))
 
@@ -43,10 +45,12 @@ class BasicDataset(Dataset):
         return img_trans
 
     def __getitem__(self, i):
-        idx = self.ids[i]
+        idx = self.ids[i]        
         mask_file = glob(self.masks_dir + idx + self.mask_suffix + '.*')
         img_file = glob(self.imgs_dir + idx + '.*')
-
+        # print('\n\n\n')
+        # print(mask_file)
+        # print('\n\n\n')
         assert len(mask_file) == 1, \
             f'Either no mask or multiple masks found for the ID {idx}: {mask_file}'
         assert len(img_file) == 1, \
@@ -54,12 +58,17 @@ class BasicDataset(Dataset):
         mask = Image.open(mask_file[0])
         img = Image.open(img_file[0])
 
-        assert img.size == mask.size, \
-            f'Image and mask {idx} should be the same size, but are {img.size} and {mask.size}'
-
+      
         img = self.preprocess(img, self.scale)
         mask = self.preprocess(mask, self.scale)
 
+        assert img.shape[1:] == mask.shape[1:], \
+            f'Image and mask {idx} should be the same size, but are {img.shape} and {mask.shape}'
+
+        
+        # print('\n\n\n')
+        # print(img.shape, mask.shape)
+        # print('\n\n\n')
         return {
             'image': torch.from_numpy(img).type(torch.FloatTensor),
             'mask': torch.from_numpy(mask).type(torch.FloatTensor)

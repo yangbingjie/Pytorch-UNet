@@ -52,12 +52,13 @@ def predict_img(net,
 def get_args():
     parser = argparse.ArgumentParser(description='Predict masks from input images',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--model', '-m', default='MODEL.pth',
+    parser.add_argument('--model', '-m', default='./runs/01_OD/CP_epoch60.pth',
                         metavar='FILE',
                         help="Specify the file in which the model is stored")
-    parser.add_argument('--input', '-i', metavar='INPUT', nargs='+',
-                        help='filenames of input images', required=True)
-
+    parser.add_argument('--input_dir', '-i', metavar='INPUT', nargs='+',
+                        default='/home/archive/Files/Lab407/Datasets/IDRiD3/test/images/',
+                        help='filenames of input images')
+    parser.add_argument('--out_path', default='./OUT/01_OD/')
     parser.add_argument('--output', '-o', metavar='INPUT', nargs='+',
                         help='Filenames of ouput images')
     parser.add_argument('--viz', '-v', action='store_true',
@@ -68,28 +69,31 @@ def get_args():
                         default=False)
     parser.add_argument('--mask-threshold', '-t', type=float,
                         help="Minimum probability value to consider a mask pixel white",
-                        default=0.5)
+                        default=0.6)
     parser.add_argument('--scale', '-s', type=float,
                         help="Scale factor for the input images",
-                        default=0.5)
+                        default=1)
 
     return parser.parse_args()
 
 
 def get_output_filenames(args):
-    in_files = args.input
+    in_files = os.listdir(args.input_dir)
+    for ind, item in enumerate(in_files):
+        in_files[ind] = os.path.join(args.input_dir, item)
     out_files = []
 
     if not args.output:
         for f in in_files:
-            pathsplit = os.path.splitext(f)
-            out_files.append("{}_OUT{}".format(pathsplit[0], pathsplit[1]))
+            path = os.path.basename(f)
+            pathsplit = path.split('.')
+            out_files.append(os.path.join(args.out_path, pathsplit[0] + '_out.' + pathsplit[1]))
     elif len(in_files) != len(args.output):
         logging.error("Input files and output files are not of the same length")
         raise SystemExit()
     else:
         out_files = args.output
-
+   
     return out_files
 
 
@@ -99,7 +103,11 @@ def mask_to_image(mask):
 
 if __name__ == "__main__":
     args = get_args()
-    in_files = args.input
+    in_files = os.listdir(args.input_dir)
+    for ind, item in enumerate(in_files):
+        in_files[ind] = os.path.join(args.input_dir, item)
+    if not os.path.exists(args.out_path):
+        os.mkdir(args.out_path)
     out_files = get_output_filenames(args)
 
     net = UNet(n_channels=3, n_classes=1)
