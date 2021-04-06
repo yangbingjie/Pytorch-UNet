@@ -11,17 +11,19 @@ from tqdm import tqdm
 
 from eval import eval_net
 from unet import UNet
+from utils.ReDirectSTD import ReDirectSTD, time_str
 
 from torch.utils.tensorboard import SummaryWriter
 from utils.dataset import BasicDataset
 from torch.utils.data import DataLoader, random_split
 
 dir_img = '/home/archive/Files/Lab407/Datasets/IDRiD4/train/images/'
-dir_mask = '/home/archive/Files/Lab407/Datasets/IDRiD4/train/label/SE/'
+dir_mask = '/home/archive/Files/Lab407/Datasets/IDRiD4/train/label/'
 test_dir_img = '/home/archive/Files/Lab407/Datasets/IDRiD4/test/images/'
-test_dir_mask = '/home/archive/Files/Lab407/Datasets/IDRiD4/test/label/SE/'
-out_root = './runs/02_SE/'
+test_dir_mask = '/home/archive/Files/Lab407/Datasets/IDRiD4/test/label/'
+out_root = './runs/02_ALL/'
 os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+lesion = ["MA", "EX", "HE", "SE"]
 
 def train_net(net,
               device,
@@ -32,9 +34,9 @@ def train_net(net,
               save_cp=True,
               img_scale=0.5):
 
-    train = BasicDataset(dir_img, dir_mask, img_scale)
+    train = BasicDataset(lesion, dir_img, dir_mask, img_scale)
     n_train = len(train)
-    val = BasicDataset(test_dir_img, test_dir_mask, img_scale)
+    val = BasicDataset(lesion, test_dir_img, test_dir_mask, img_scale)
     n_val = len(val)
     train_loader = DataLoader(train, batch_size=batch_size, shuffle=True, num_workers=1, pin_memory=False)
     val_loader = DataLoader(val, batch_size=batch_size, shuffle=False, num_workers=1, pin_memory=False, drop_last=True)
@@ -58,10 +60,10 @@ def train_net(net,
     # scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[30, 45])
     # optimizer = optim.RMSprop(net.parameters(), lr=lr, weight_decay=1e-8, momentum=0.5)
     # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min' if net.n_classes > 1 else 'max', patience=5)
-    if net.n_classes > 1:
-        criterion = nn.CrossEntropyLoss()
-    else:
-        criterion = nn.BCEWithLogitsLoss()
+    # if net.n_classes > 1:
+    #     criterion = nn.CrossEntropyLoss()
+    # else:
+    criterion = nn.BCEWithLogitsLoss()
     max_pr = 0
     for epoch in range(epochs):
         net.train()        
@@ -80,7 +82,10 @@ def train_net(net,
                 true_masks = true_masks.to(device=device, dtype=mask_type)
 
                 masks_pred = net(imgs)
-                loss = criterion(masks_pred, true_masks)
+                # print('\n\n\n')
+                # print(masks_pred.shape, true_masks.shape)
+                # print('\n\n\n')
+                loss = criterion(masks_pred, true_masks.float())
                 epoch_loss += loss.item()
                 
                 pbar.set_postfix(**{'loss (batch)': loss.item()})
@@ -97,18 +102,23 @@ def train_net(net,
                 tag = tag.replace('.', '/')
                 writer.add_histogram('weights/' + tag, value.data.cpu().numpy(), epoch)
                 writer.add_histogram('grads/' + tag, value.grad.data.cpu().numpy(), epoch)
-            result = eval_net(net, val_loader, device)
+            result = eval_net(lesion, net, val_loader, device)
             writer.add_scalar('learning_rate', optimizer.param_groups[0]['lr'], epoch)
-            writer.add_scalar('val_roc_auc', result['val_roc_auc'], epoch)
-            writer.add_scalar('val_pr_auc', result['val_pr_auc'], epoch)
+            writer.add_scalar('val_roc_mean', result['val_roc_mean'], epoch)
+            writer.add_scalar('val_pr_mean', result['val_pr_mean'], epoch)
+            for i, str in enumerate(lesion):
+                writer.add_scalar('roc_auc/' + str,
+                 result['val_roc_auc_' + str], epoch)
+                writer.add_scalar('pr_auc/' + str,
+                 result['val_pr_auc_' + str], epoch)
             writer.add_scalar('Loss/train', epoch_loss, epoch)
 
-            if net.n_classes > 1:
-                logging.info('Validation cross entropy: {}'.format(result['val_loss']))
-                writer.add_scalar('Loss/test', result['val_loss'], epoch)
-            else:
-                logging.info('Validation Dice Coeff: {}'.format(result['val_loss']))
-                writer.add_scalar('Dice/test', result['val_loss'], epoch)
+            # if net.n_classes > 1:
+            #     logging.info('Validation cross entropy: {}'.format(result['val_loss']))
+            #     writer.add_scalar('Loss/test', result['val_loss'], epoch)
+            # else:
+            logging.info('Validation Dice Coeff: {}'.format(result['val_loss']))
+            writer.add_scalar('Dice/test', result['val_loss'], epoch)
 
             writer.add_images('images', imgs, epoch)
             if net.n_classes == 1:
@@ -116,8 +126,8 @@ def train_net(net,
                 writer.add_images('masks/pred', torch.sigmoid(masks_pred) > 0.5, epoch)
         # scheduler.step()
         if save_cp:
-            if max_pr < result['val_pr_auc']:
-                max_pr = result['val_pr_auc']
+            if max_pr < result['val_roc_mean']:
+                max_pr = result['val_roc_mean']
                 
                 torch.save(net.state_dict(),
                        out_root + f'best.pth')
@@ -140,7 +150,7 @@ def get_args():
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-e', '--epochs', metavar='E', type=int, default=80,
                         help='Number of epochs', dest='epochs')
-    parser.add_argument('-b', '--batch-size', metavar='B', type=int, nargs='?', default=4,
+    parser.add_argument('-b', '--batch-size', metavar='B', type=int, nargs='?', default=3,
                         help='Batch size', dest='batchsize')
     parser.add_argument('-l', '--learning-rate', metavar='LR', type=float, nargs='?', default=2e-4,
                         help='Learning rate', dest='lr')
@@ -159,6 +169,15 @@ if __name__ == '__main__':
     args = get_args()
     device = torch.device('cuda')
     logging.info(f'Using device {device}')
+
+    if not os.path.exists(out_root):
+        os.makedirs(out_root)
+    stdout_file = os.path.join(
+        out_root, 'stdout_{}.txt'.format(time_str()))
+    stderr_file = os.path.join(
+        out_root, 'stderr_{}.txt'.format(time_str()))
+    ReDirectSTD(stdout_file, 'stdout', False)
+    ReDirectSTD(stderr_file, 'stderr', False)
     
 
     # Change here to adapt to your data
@@ -167,7 +186,7 @@ if __name__ == '__main__':
     #   - For 1 class and background, use n_classes=1
     #   - For 2 classes, use n_classes=1
     #   - For N > 2 classes, use n_classes=N
-    net = UNet(n_channels=3, n_classes=1, bilinear=True)
+    net = UNet(n_channels=3, n_classes=4, bilinear=True)
     logging.info(f'Network:\n'
                  f'\t{net.n_channels} input channels\n'
                  f'\t{net.n_classes} output channels (classes)\n'

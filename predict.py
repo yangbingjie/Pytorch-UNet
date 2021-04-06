@@ -52,11 +52,11 @@ def predict_img(net,
 def get_args():
     parser = argparse.ArgumentParser(description='Predict masks from input images',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--model', '-m', default='./runs/01_OD/CP_epoch60.pth',
+    parser.add_argument('--model', '-m', default='./runs/02_ALL/best.pth',
                         metavar='FILE',
                         help="Specify the file in which the model is stored")
     parser.add_argument('--input_dir', '-i', metavar='INPUT', nargs='+',
-                        default='/home/archive/Files/Lab407/Datasets/IDRiD3/test/images/',
+                        default='/home/archive/Files/Lab407/Datasets/IDRiD4/test/images/',
                         help='filenames of input images')
     parser.add_argument('--out_path', default='./OUT/01_OD/')
     parser.add_argument('--output', '-o', metavar='INPUT', nargs='+',

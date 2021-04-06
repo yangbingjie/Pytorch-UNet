@@ -1,5 +1,6 @@
 from os.path import splitext
 from os import listdir
+import os
 import numpy as np
 from glob import glob
 import torch
@@ -9,7 +10,8 @@ from PIL import Image
 
 
 class BasicDataset(Dataset):
-    def __init__(self, imgs_dir, masks_dir, scale=1, mask_suffix=''):
+    def __init__(self, lesion, imgs_dir, masks_dir, scale=1, mask_suffix=''):
+        self.lesion = lesion
         self.imgs_dir = imgs_dir
         self.masks_dir = masks_dir
         self.scale = scale
@@ -27,8 +29,8 @@ class BasicDataset(Dataset):
     @classmethod
     def preprocess(cls, pil_img, scale):
         w, h = pil_img.size
-        newW, newH = 512, 512
-        
+        newW, newH = int(scale * w), int(scale * h)
+
         assert newW > 0 and newH > 0, 'Scale is too small'
         pil_img = pil_img.resize((newW, newH))
 
@@ -46,32 +48,39 @@ class BasicDataset(Dataset):
 
     def __getitem__(self, i):
         idx = self.ids[i]        
-        mask_file = glob(self.masks_dir + idx + self.mask_suffix + '.*')
+        
         img_file = glob(self.imgs_dir + idx + '.*')
         # print('\n\n\n')
         # print(mask_file)
         # print('\n\n\n')
-        assert len(mask_file) == 1, \
-            f'Either no mask or multiple masks found for the ID {idx}: {mask_file}'
+        # assert len(mask_file) == 1, \
+        #     f'Either no mask or multiple masks found for the ID {idx}: {mask_file}'
         assert len(img_file) == 1, \
             f'Either no image or multiple images found for the ID {idx}: {img_file}'
-        mask = Image.open(mask_file[0])
+               
         img = Image.open(img_file[0])
-
-      
         img = self.preprocess(img, self.scale)
-        mask = self.preprocess(mask, self.scale)
 
+        mask_list = []
+
+        for i, str in enumerate(self.lesion):
+            mask = Image.open(os.path.join(self.masks_dir, str, os.path.basename(img_file[0]).split('.')[0] + '.tif'))
+            mask = self.preprocess(mask, self.scale)
+            mask_list.append(mask)
+        
+        mask_arr = np.array(mask_list).squeeze()
+        # print('\n\n\n') 
+        # print(mask_arr.shape)
+        # print('\n\n\n')
+        # exit(1)
         assert img.shape[1:] == mask.shape[1:], \
             f'Image and mask {idx} should be the same size, but are {img.shape} and {mask.shape}'
 
         
-        # print('\n\n\n')
-        # print(img.shape, mask.shape)
-        # print('\n\n\n')
+        
         return {
             'image': torch.from_numpy(img).type(torch.FloatTensor),
-            'mask': torch.from_numpy(mask).type(torch.FloatTensor)
+            'mask': torch.from_numpy(mask_arr).type(torch.FloatTensor)
         }
 
 
