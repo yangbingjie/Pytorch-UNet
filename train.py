@@ -16,12 +16,12 @@ from torch.utils.tensorboard import SummaryWriter
 from utils.dataset import BasicDataset
 from torch.utils.data import DataLoader, random_split
 
-dir_img = '/home/archive/Files/Lab407/Datasets/IDRiD3/train/images/'
-dir_mask = '/home/archive/Files/Lab407/Datasets/IDRiD3/train/label/SE/'
-test_dir_img = '/home/archive/Files/Lab407/Datasets/IDRiD3/test/images/'
-test_dir_mask = '/home/archive/Files/Lab407/Datasets/IDRiD3/test/label/SE/'
-out_root = './runs/04_SE/'
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+dir_img = '/home/archive/Files/Lab407/Datasets/IDRiD4/train/images/'
+dir_mask = '/home/archive/Files/Lab407/Datasets/IDRiD4/train/label/SE/'
+test_dir_img = '/home/archive/Files/Lab407/Datasets/IDRiD4/test/images/'
+test_dir_mask = '/home/archive/Files/Lab407/Datasets/IDRiD4/test/label/SE/'
+out_root = './runs/02_SE/'
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 def train_net(net,
               device,
@@ -53,15 +53,16 @@ def train_net(net,
         Images scaling:  {img_scale}
     ''')
 
-    optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=0.5)
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[30, 45])
+    optimizer = torch.optim.Adam(net.parameters(), lr=lr, betas=(0.5, 0.999))
+    # optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=0.5)
+    # scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[30, 45])
     # optimizer = optim.RMSprop(net.parameters(), lr=lr, weight_decay=1e-8, momentum=0.5)
     # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min' if net.n_classes > 1 else 'max', patience=5)
     if net.n_classes > 1:
         criterion = nn.CrossEntropyLoss()
     else:
         criterion = nn.BCEWithLogitsLoss()
-
+    max_pr = 0
     for epoch in range(epochs):
         net.train()        
         epoch_loss = 0
@@ -113,16 +114,23 @@ def train_net(net,
             if net.n_classes == 1:
                 writer.add_images('masks/true', true_masks, epoch)
                 writer.add_images('masks/pred', torch.sigmoid(masks_pred) > 0.5, epoch)
-        scheduler.step()
+        # scheduler.step()
         if save_cp:
+            if max_pr < result['val_pr_auc']:
+                max_pr = result['val_pr_auc']
+                
+                torch.save(net.state_dict(),
+                       out_root + f'best.pth')
+                logging.info(f'Checkpoint {epoch + 1} saved !')
             # try:
             #     os.mkdir(dir_checkpoint)
             #     logging.info('Created checkpoint directory')
             # except OSError:
             #     pass
-            torch.save(net.state_dict(),
-                       out_root + f'CP_epoch{epoch + 1}.pth')
-            logging.info(f'Checkpoint {epoch + 1} saved !')
+    if save_cp:
+        torch.save(net.state_dict(),
+                       out_root + f'last.pth')
+        logging.info(f'Checkpoint {epoch + 1} saved !')       
 
     writer.close()
 
@@ -130,11 +138,11 @@ def train_net(net,
 def get_args():
     parser = argparse.ArgumentParser(description='Train the UNet on images and target masks',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('-e', '--epochs', metavar='E', type=int, default=60,
+    parser.add_argument('-e', '--epochs', metavar='E', type=int, default=80,
                         help='Number of epochs', dest='epochs')
     parser.add_argument('-b', '--batch-size', metavar='B', type=int, nargs='?', default=4,
                         help='Batch size', dest='batchsize')
-    parser.add_argument('-l', '--learning-rate', metavar='LR', type=float, nargs='?', default=1e-5,
+    parser.add_argument('-l', '--learning-rate', metavar='LR', type=float, nargs='?', default=2e-4,
                         help='Learning rate', dest='lr')
     parser.add_argument('-f', '--load', dest='load', type=str, default=False,
                         help='Load model from a .pth file')

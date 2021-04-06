@@ -33,9 +33,9 @@ def preprocessing_imgs_kaggle(file, resize_lesion_imgs, scale=348):
 
     resize_img, resize_lesion_imgs = scaleRadius(file, resize_lesion_imgs, scale)
        
-    # resize_img = cv2.addWeighted(resize_img, 4,
-    #                       cv2.GaussianBlur(resize_img, (0, 0), scale / 30), -4,
-    #                       128)
+    resize_img = cv2.addWeighted(resize_img, 4,
+                          cv2.GaussianBlur(resize_img, (0, 0), scale / 30), -4,
+                          128)
     mask = np.zeros(resize_img.shape)
     cv2.circle(mask, (resize_img.shape[1] // 2, resize_img.shape[0] // 2),
                int(scale * 0.92), (1, 1, 1), -1, 8, 0)
@@ -101,7 +101,7 @@ def preprocessing_imgs_kaggle(file, resize_lesion_imgs, scale=348):
 
 
 root_path = '/home/archive/Files/Lab407/Datasets/IDRiD2/'
-out_path = '/home/archive/Files/Lab407/Datasets/IDRiD3/'
+out_path = '/home/archive/Files/Lab407/Datasets/IDRiD4/'
 sub_folder = ['test', 'train']
 lesion_types = ['MA', 'HE', 'EX', 'SE', 'OD']
 size = (640, 640)
