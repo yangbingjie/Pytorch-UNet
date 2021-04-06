@@ -46,8 +46,10 @@ def eval_net(lesion, net, loader, device):
         result['val_roc_auc_' + str] = metrics.roc_auc_score(y_true[i].flatten(), y_preds[i].flatten())
         precision, recall, thresholds = metrics.precision_recall_curve(y_true[i].flatten(), y_preds[i].flatten())
         result['val_pr_auc_' + str] = metrics.auc(recall, precision)
+        result['val_thresholds_' + str] = thresholds[np.argmax(precision + recall)]        
         val_roc_sum += result['val_roc_auc_' + str]
         val_pr_sum += result['val_pr_auc_' + str]
+        
     result['val_roc_mean'] = val_roc_sum / (len(lesion))
     result['val_pr_mean'] = val_pr_sum / (len(lesion))
     net.train()

@@ -21,7 +21,7 @@ dir_img = '/home/archive/Files/Lab407/Datasets/IDRiD4/train/images/'
 dir_mask = '/home/archive/Files/Lab407/Datasets/IDRiD4/train/label/'
 test_dir_img = '/home/archive/Files/Lab407/Datasets/IDRiD4/test/images/'
 test_dir_mask = '/home/archive/Files/Lab407/Datasets/IDRiD4/test/label/'
-out_root = './runs/02_ALL/'
+out_root = './runs/04_ALL/'
 os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 lesion = ["MA", "EX", "HE", "SE"]
 
@@ -111,6 +111,8 @@ def train_net(net,
                  result['val_roc_auc_' + str], epoch)
                 writer.add_scalar('pr_auc/' + str,
                  result['val_pr_auc_' + str], epoch)
+                writer.add_scalar('thres/' + str,
+                 result['val_thresholds_' + str], epoch)
             writer.add_scalar('Loss/train', epoch_loss, epoch)
 
             # if net.n_classes > 1:
@@ -148,7 +150,7 @@ def train_net(net,
 def get_args():
     parser = argparse.ArgumentParser(description='Train the UNet on images and target masks',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('-e', '--epochs', metavar='E', type=int, default=80,
+    parser.add_argument('-e', '--epochs', metavar='E', type=int, default=100,
                         help='Number of epochs', dest='epochs')
     parser.add_argument('-b', '--batch-size', metavar='B', type=int, nargs='?', default=3,
                         help='Batch size', dest='batchsize')

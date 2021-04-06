@@ -46,19 +46,26 @@ def predict_img(net,
         probs = tf(probs.cpu())
         full_mask = probs.squeeze().cpu().numpy()
 
-    return full_mask > out_threshold
+    result = np.zeros(full_mask.shape, dtype=np.bool)
+    for i, thres in enumerate(out_threshold):
+        result[i] = full_mask[i] > out_threshold[i]
+    return result
 
 
 def get_args():
     parser = argparse.ArgumentParser(description='Predict masks from input images',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--model', '-m', default='./runs/02_ALL/best.pth',
+    parser.add_argument('--model', '-m', default='./runs/03_ALL/best.pth',
                         metavar='FILE',
                         help="Specify the file in which the model is stored")
     parser.add_argument('--input_dir', '-i', metavar='INPUT', nargs='+',
                         default='/home/archive/Files/Lab407/Datasets/IDRiD4/test/images/',
                         help='filenames of input images')
-    parser.add_argument('--out_path', default='./OUT/01_OD/')
+    parser.add_argument('--out_path', default='./OUT/03_ALL/')
+    parser.add_argument('--lesion', default=["MA", "EX", "HE", "SE"])
+    parser.add_argument('--mask-threshold', '-t', type=float,
+                        help="Minimum probability value to consider a mask pixel white",
+                        default=[0.35, 0.5, 0.7, 0.7])
     parser.add_argument('--output', '-o', metavar='INPUT', nargs='+',
                         help='Filenames of ouput images')
     parser.add_argument('--viz', '-v', action='store_true',
@@ -67,9 +74,6 @@ def get_args():
     parser.add_argument('--no-save', '-n', action='store_true',
                         help="Do not save the output masks",
                         default=False)
-    parser.add_argument('--mask-threshold', '-t', type=float,
-                        help="Minimum probability value to consider a mask pixel white",
-                        default=0.6)
     parser.add_argument('--scale', '-s', type=float,
                         help="Scale factor for the input images",
                         default=1)
@@ -81,20 +85,23 @@ def get_output_filenames(args):
     in_files = os.listdir(args.input_dir)
     for ind, item in enumerate(in_files):
         in_files[ind] = os.path.join(args.input_dir, item)
-    out_files = []
-
+    
+    out_list = []
     if not args.output:
         for f in in_files:
             path = os.path.basename(f)
             pathsplit = path.split('.')
-            out_files.append(os.path.join(args.out_path, pathsplit[0] + '_out.' + pathsplit[1]))
+            out_files = []
+            for str in args.lesion:
+                out_files.append(os.path.join(args.out_path, str, pathsplit[0] + '_out.' + pathsplit[1]))
+            out_list.append(out_files)
     elif len(in_files) != len(args.output):
         logging.error("Input files and output files are not of the same length")
         raise SystemExit()
     else:
         out_files = args.output
    
-    return out_files
+    return out_list
 
 
 def mask_to_image(mask):
@@ -108,9 +115,12 @@ if __name__ == "__main__":
         in_files[ind] = os.path.join(args.input_dir, item)
     if not os.path.exists(args.out_path):
         os.mkdir(args.out_path)
+    for str in args.lesion:
+        if not os.path.exists(os.path.join(args.out_path, str)):
+            os.mkdir(os.path.join(args.out_path, str))
     out_files = get_output_filenames(args)
 
-    net = UNet(n_channels=3, n_classes=1)
+    net = UNet(n_channels=3, n_classes=len(args.lesion))
 
     logging.info("Loading model {}".format(args.model))
 
@@ -133,11 +143,11 @@ if __name__ == "__main__":
                            device=device)
 
         if not args.no_save:
-            out_fn = out_files[i]
-            result = mask_to_image(mask)
-            result.save(out_files[i])
-
-            logging.info("Mask saved to {}".format(out_files[i]))
+            out_fn = out_files[i]            
+            for j, str in enumerate(args.lesion):
+                result = mask_to_image(mask[j])
+                result.save(out_files[i][j])
+                logging.info("Mask saved to {}".format(out_files[i][j]))
 
         if args.viz:
             logging.info("Visualizing results for image {}, close to continue ...".format(fn))
