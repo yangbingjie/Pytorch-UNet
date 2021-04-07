@@ -21,7 +21,7 @@ dir_img = '/home/archive/Files/Lab407/Datasets/IDRiD4/train/images/'
 dir_mask = '/home/archive/Files/Lab407/Datasets/IDRiD4/train/label/'
 test_dir_img = '/home/archive/Files/Lab407/Datasets/IDRiD4/test/images/'
 test_dir_mask = '/home/archive/Files/Lab407/Datasets/IDRiD4/test/label/'
-out_root = './runs/04_ALL/'
+out_root = './runs/06_ALL/'
 os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 lesion = ["MA", "EX", "HE", "SE"]
 
@@ -128,12 +128,13 @@ def train_net(net,
                 writer.add_images('masks/pred', torch.sigmoid(masks_pred) > 0.5, epoch)
         # scheduler.step()
         if save_cp:
-            if max_pr < result['val_roc_mean']:
-                max_pr = result['val_roc_mean']
+            if max_pr < result['val_pr_mean']:
+                max_pr = result['val_pr_mean']
                 
                 torch.save(net.state_dict(),
                        out_root + f'best.pth')
                 logging.info(f'Checkpoint {epoch + 1} saved !')
+                print(f'Checkpoint {epoch + 1} saved !')
             # try:
             #     os.mkdir(dir_checkpoint)
             #     logging.info('Created checkpoint directory')
@@ -150,7 +151,7 @@ def train_net(net,
 def get_args():
     parser = argparse.ArgumentParser(description='Train the UNet on images and target masks',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('-e', '--epochs', metavar='E', type=int, default=100,
+    parser.add_argument('-e', '--epochs', metavar='E', type=int, default=140,
                         help='Number of epochs', dest='epochs')
     parser.add_argument('-b', '--batch-size', metavar='B', type=int, nargs='?', default=3,
                         help='Batch size', dest='batchsize')
