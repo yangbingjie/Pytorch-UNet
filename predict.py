@@ -55,17 +55,17 @@ def predict_img(net,
 def get_args():
     parser = argparse.ArgumentParser(description='Predict masks from input images',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--model', '-m', default='./runs/05_ALL/best.pth',
+    parser.add_argument('--model', '-m', default='./runs/06_ALL/best.pth',
                         metavar='FILE',
                         help="Specify the file in which the model is stored")
     parser.add_argument('--input_dir', '-i', metavar='INPUT', nargs='+',
                         default='/home/archive/Files/Lab407/Datasets/IDRiD4/test/images/',
                         help='filenames of input images')
-    parser.add_argument('--out_path', default='./OUT/05_ALL/')
+    parser.add_argument('--out_path', default='./OUT/07_ALL_ARGU/')
     parser.add_argument('--lesion', default=["MA", "EX", "HE", "SE"])
     parser.add_argument('--mask-threshold', '-t', type=float,
                         help="Minimum probability value to consider a mask pixel white",
-                        default=[0.2922, 0.4769, 0.6065, 0.4198])
+                        default=[0.4506, 0.7, 0.8, 0.7])
     parser.add_argument('--output', '-o', metavar='INPUT', nargs='+',
                         help='Filenames of ouput images')
     parser.add_argument('--viz', '-v', action='store_true',

@@ -7,14 +7,16 @@ import torch
 from torch.utils.data import Dataset
 import logging
 from PIL import Image
+import random
 
 
 class BasicDataset(Dataset):
-    def __init__(self, lesion, imgs_dir, masks_dir, scale=1, mask_suffix=''):
+    def __init__(self, lesion, imgs_dir, masks_dir, scale=1, mask_suffix='', transform=None):
         self.lesion = lesion
         self.imgs_dir = imgs_dir
         self.masks_dir = masks_dir
         self.scale = scale
+        self.transform = transform
         self.mask_suffix = mask_suffix
         assert 0 < scale <= 1, 'Scale must be between 0 and 1'
 
@@ -61,11 +63,23 @@ class BasicDataset(Dataset):
         img = Image.open(img_file[0])
         img = self.preprocess(img, self.scale)
 
+        seed = np.random.randint(2147483647) # make a seed with numpy generator 
+        random.seed(seed) # apply this seed to img tranfsorms
+        torch.manual_seed(seed) # needed for torchvision 0.7
+        if self.transform is not None:
+            img = self.transform(img)
+
         mask_list = []
 
         for i, str in enumerate(self.lesion):
             mask = Image.open(os.path.join(self.masks_dir, str, os.path.basename(img_file[0]).split('.')[0] + '.tif'))
             mask = self.preprocess(mask, self.scale)
+
+            random.seed(seed) # apply this seed to img tranfsorms
+            torch.manual_seed(seed) # needed for torchvision 0.7
+            if self.transform is not None:
+                mask = self.transform(mask)
+
             mask_list.append(mask)
         
         mask_arr = np.array(mask_list).squeeze()

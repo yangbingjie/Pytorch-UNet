@@ -16,13 +16,14 @@ from utils.ReDirectSTD import ReDirectSTD, time_str
 from torch.utils.tensorboard import SummaryWriter
 from utils.dataset import BasicDataset
 from torch.utils.data import DataLoader, random_split
+from torchvision import transforms
 
 dir_img = '/home/archive/Files/Lab407/Datasets/IDRiD4/train/images/'
 dir_mask = '/home/archive/Files/Lab407/Datasets/IDRiD4/train/label/'
 test_dir_img = '/home/archive/Files/Lab407/Datasets/IDRiD4/test/images/'
 test_dir_mask = '/home/archive/Files/Lab407/Datasets/IDRiD4/test/label/'
-out_root = './runs/06_ALL/'
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+out_root = './runs/07_ALL_ARGU/'
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 lesion = ["MA", "EX", "HE", "SE"]
 
 def train_net(net,
@@ -33,8 +34,12 @@ def train_net(net,
               val_percent=0.1,
               save_cp=True,
               img_scale=0.5):
-
-    train = BasicDataset(lesion, dir_img, dir_mask, img_scale)
+    transform = transforms.Compose([
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomVerticalFlip(),
+        transforms.RandomRotation([0, 360]),
+    ])
+    train = BasicDataset(lesion, dir_img, dir_mask, img_scale, transform)
     n_train = len(train)
     val = BasicDataset(lesion, test_dir_img, test_dir_mask, img_scale)
     n_val = len(val)
