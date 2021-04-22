@@ -15,7 +15,7 @@ from PIL import Image
 import cv2
 
 
-def scaleRadius(resize_img, resize_lesion_imgs, scale):
+def scaleRadius(file_name, resize_img, resize_lesion_imgs, scale):
     mid = np.sum(resize_img[resize_img.shape[0] // 2, :, :], axis=1)
     x = resize_img[resize_img.shape[0] // 2, :, :].sum(1)
     l_shift, r_shift = 0, 0
@@ -40,9 +40,15 @@ def scaleRadius(resize_img, resize_lesion_imgs, scale):
         resize_img = resize_img[:, :(resize_img.shape[1] - remove_diff), :]
         resize_img = np.pad(resize_img, ((0, 0), (remove_diff, 0), (0, 0)), mode='constant', constant_values=(0))
 
-    r = (x > x_mean / 10).sum() / 2
+    r = (x > x_mean / 7).sum() / 2
     # print(x, r)
-    s = scale * 1 / r
+    # if file_name == 'IDRiD_01.jpg':
+    #     s = scale * 1.033 / r
+    # elif file_name == 'IDRiD_73.jpg':
+    #     s = scale * 1.02 / r
+    # else:
+    s = scale / r
+    
     lesion_img_list = []
     for lesion_img in resize_lesion_imgs:
         if lesion_img is not None:
@@ -61,44 +67,70 @@ def scaleRadius(resize_img, resize_lesion_imgs, scale):
     return cv2.resize(resize_img, (0, 0), fx=s, fy=s), lesion_img_list
 
 
-def preprocessing_imgs_kaggle(file, resize_lesion_imgs, scale=320):
+def preprocessing_imgs_kaggle(file_name, file, resize_lesion_imgs, scale=320):
     # print(resize_lesion_imgs[0].dtype)
 
-    resize_img, resize_lesion_imgs = scaleRadius(file, resize_lesion_imgs, scale)
-    
-    distance = np.zeros(resize_img.shape)
-    c_x = resize_img.shape[1] // 2
-    c_y = resize_img.shape[0] // 2
-    x, y, _ = distance.shape
+    resize_img, resize_lesion_imgs = scaleRadius(file_name, file, resize_lesion_imgs, scale)
+    cv2.imwrite('/home/bella/Projects/DR/b.jpg', resize_img)
 
-    for i in range(x):
-        for j in range(y):
-            distance[i][j] = math.sqrt((i - c_y) ** 2 + (j - c_x) ** 2) ** 6
+    blur_img = cv2.GaussianBlur(resize_img, (0, 0), scale / 40)
+    cv2.imwrite('/home/bella/Projects/DR/c.jpg', blur_img)
+    rat = (scale+30)/scale
+    large_img = cv2.resize(blur_img, (0, 0), fx=rat, fy=rat)
+    rx, ry, _ = resize_img.shape
+    xx, yy, _ = large_img.shape
+   
+    # print(xx, yy)
+
+    large_img = large_img[(xx-rx) // 2:((xx-rx) // 2 + rx),(yy-ry) // 2:((yy-ry) // 2 + ry),:]
+    # print(resize_img.shape, large_img.shape)
+    cv2.imwrite('/home/bella/Projects/DR/d.jpg', large_img)
+
+    mask = np.zeros(resize_img.shape)
+    eps = 2
+    cv2.circle(mask, (resize_img.shape[1] // 2, resize_img.shape[0] // 2),
+               scale-eps, (1, 1, 1), -1, 8, 0)
+    extend_img = resize_img * mask + large_img * (1 - mask)
+    cv2.imwrite('/home/bella/Projects/DR/e.jpg', extend_img)
+
+
+    # distance = np.zeros(resize_img.shape)
+    # c_x = resize_img.shape[1] // 2
+    # c_y = resize_img.shape[0] // 2
+    # x, y, _ = distance.shape
+
+    # for i in range(x):
+    #     for j in range(y):
+    #         distance[i][j] = math.sqrt((i - c_y) ** 2 + (j - c_x) ** 2) ** 6
     # **2 0.018
     # **3 0.0000052
     # **4 0.000000015
     # **5 0.000000000042
     # **6 0.00000000000019
     # for ind, weight in enumerate(np.arange(0.0, 0.0000000000003, 0.00000000000001)):        
-    weight = 0.0000000000002
-    ind = 0
-    bright_img = resize_img + weight * distance
-    cv2.imwrite('/home/bella/Projects/DR/c'+ str(ind) +'.jpg', bright_img)
-    bright_img = cv2.imread('/home/bella/Projects/DR/c'+ str(ind) +'.jpg')
-    gauss_img = cv2.addWeighted(bright_img, 4,
-                        cv2.GaussianBlur(bright_img, (0, 0), scale / 40), -4,
-                        128)
-    # cv2.imwrite('/home/bella/Projects/DR/d'+ str(ind) +'.jpg', gauss_img)
-    
+    # weight = 0.0000000000002
+    # ind = 0
+    # bright_img = resize_img + weight * distance
+    # cv2.imwrite('/home/bella/Projects/DR/g'+ str(ind) +'.jpg', bright_img)
+    # bright_img = cv2.imread('/home/bella/Projects/DR/h'+ str(ind) +'.jpg')
+    # gauss_img = cv2.addWeighted(bright_img, 4,
+    #                     cv2.GaussianBlur(bright_img, (0, 0), scale / 40), -4,
+    #                     128)
+    # cv2.imwrite('/home/bella/Projects/DR/j'+ str(ind) +'.jpg', gauss_img)
     
 
-    # resize_img = cv2.addWeighted(resize_img, 4,
-    #                       cv2.GaussianBlur(resize_img, (0, 0), scale / 30), -4,
-    #                       128)
-    mask = np.zeros(gauss_img.shape)
-    cv2.circle(mask, (gauss_img.shape[1] // 2, gauss_img.shape[0] // 2),
-               int(scale * 1), (1, 1, 1), -1, 8, 0)
-    masked_img = gauss_img * mask + 0 * (1 - mask)
+
+    resize_img = cv2.addWeighted(extend_img, 4,
+                          cv2.GaussianBlur(extend_img, (0, 0), scale / 30), -4,
+                          128)
+    cv2.imwrite('/home/bella/Projects/DR/f.jpg', resize_img)
+
+    ration = 1
+    mask = np.zeros(resize_img.shape)
+    
+    cv2.circle(mask, (resize_img.shape[1] // 2, resize_img.shape[0] // 2),
+               scale - eps, (1, 1, 1), -1, 8, 0)
+    masked_img = resize_img * mask + 0 * (1 - mask)
 
     label_mask = np.asarray(mask[:,:,0], dtype=np.uint8)
     for i, resize_lesion in enumerate(resize_lesion_imgs):
@@ -114,7 +146,7 @@ def preprocessing_imgs_kaggle(file, resize_lesion_imgs, scale=320):
     box_radius = np.min(masked_img.shape[:-1]) // 2
 
     clipped_img = masked_img[:,
-                  masked_img.shape[1] // 2 - int(scale * 1):masked_img.shape[1] // 2 + int(scale * 1)]
+                  masked_img.shape[1] // 2 - int(scale * ration):masked_img.shape[1] // 2 + int(scale * ration)]
     # cv2.imwrite('/home/bella/Projects/DR/e.jpg', clipped_img)
     
 
@@ -122,7 +154,7 @@ def preprocessing_imgs_kaggle(file, resize_lesion_imgs, scale=320):
     for resize_lesion in resize_lesion_imgs:
         if resize_lesion is not None:
             clipped_lesion = resize_lesion[:,
-                    masked_img.shape[1] // 2 - int(scale * 1):masked_img.shape[1] // 2 + int(scale * 1)]
+                    masked_img.shape[1] // 2 - int(scale * ration):masked_img.shape[1] // 2 + int(scale * ration)]
             # cv2.imwrite('/home/bella/Projects/DR/c.tif', clipped_lesion)
             clipped_lesion_list.append(clipped_lesion)
         else:
@@ -155,24 +187,26 @@ def preprocessing_imgs_kaggle(file, resize_lesion_imgs, scale=320):
             round_lesion_list.append(None)
     
     # cv2.imwrite('/home/bella/Projects/DR/e.tif', round_lesion_list[0].astype(np.uint8))
-    # cv2.imwrite('/home/bella/Projects/DR/g.jpg', round_img)    
-    # exit(1)
+    cv2.imwrite('/home/bella/Projects/DR/k.jpg', round_img)    
+    exit(1)
     return round_img, round_lesion_list
 
 
 root_path = '/home/archive/Files/Lab407/Datasets/IDRiD2/'
-out_path = '/home/archive/Files/Lab407/Datasets/IDRiD5/'
+out_path = '/home/archive/Files/Lab407/Datasets/IDRiD6/'
 sub_folder = ['test', 'train']
 lesion_types = ['MA', 'HE', 'EX', 'SE', 'OD']
 size = (640, 640)
 if not os.path.exists(out_path):
     os.mkdir(out_path)
 for folder in sub_folder:
+    # folder = 'train'
     data_path = os.path.join(root_path, folder, 'images')
     data_list = os.listdir(data_path)
     if not os.path.exists(os.path.join(out_path, folder)):
         os.mkdir(os.path.join(out_path, folder))
     for data in tqdm(data_list):
+        # data = 'IDRiD_01.jpg'
         img_path = os.path.join(data_path, data)
         lesion_imgs = []
         img = cv2.imread(img_path)
@@ -200,7 +234,7 @@ for folder in sub_folder:
                 im = cv2.imread(os.path.join(path, data.split('.')[0] + '.tif').replace(root_path, out_path), 0)
                 lesion_imgs.append(im)
 
-        new_img, new_lesion_imgs = preprocessing_imgs_kaggle(img, lesion_imgs)
+        new_img, new_lesion_imgs = preprocessing_imgs_kaggle(data,img, lesion_imgs)
         cv2.imwrite(os.path.join(data_path, data).replace(root_path, out_path), new_img)
         width, height, _ = new_img.shape
         if width != 640 or height != 640:
